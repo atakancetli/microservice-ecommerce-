@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # DISPATCHER (API Gateway) - Tek giriş noktası
+  # ==========================================
+  dispatcher:
+    build: ./dispatcher
+    container_name: dispatcher
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_URL=redis://dispatcher-redis:6379
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - PRODUCT_SERVICE_URL=http://product-service:8002
+      - ORDER_SERVICE_URL=http://order-service:8003
+      - SECRET_KEY=super-secret-key-change-in-production
+    depends_on:
+      - dispatcher-redis
+      - auth-service
+      - product-service
+      - order-service
+    networks:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+  # ==========================================
+  # AUTH SERVICE - Kimlik doğrulama
+  # ==========================================
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    environment:
+      - MONGO_URL=mongodb://auth-mongo:27017
+      - MONGO_DB=auth_db
+      - SECRET_KEY=super-secret-key-change-in-production
+    depends_on:
+      - auth-mongo
+    networks:
+      - backend
+    restart: unless-stopped
+
+  # ==========================================
+  # PRODUCT SERVICE - Ürün yönetimi
+  # ==========================================
+  product-service:
+    build: ./product-service
+    container_name: product-service
+    environment:
+      - MONGO_URL=mongodb://product-mongo:27017
+      - MONGO_DB=product_db
+    depends_on:
+      - product-mongo
+    networks:
+      - backend
+    restart: unless-stopped
+
+  # ==========================================
+  # ORDER SERVICE - Sipariş yönetimi
+  # ==========================================
+  order-service:
+    build: ./order-service
+    container_name: order-service
+    environment:
+      - MONGO_URL=mongodb://order-mongo:27017
+      - MONGO_DB=order_db
+      - PRODUCT_SERVICE_URL=http://product-service:8002
+    depends_on:
+      - order-mongo
+    networks:
+      - backend
+    restart: unless-stopped
+
+  # ==========================================
+  # DATABASES
+  # ==========================================
+  dispatcher-redis:
+    image: redis:7-alpine
+    container_name: dispatcher-redis
+    volumes:
+      - dispatcher_redis_data:/data
+    networks:
+      - backend
+    restart: unless-stopped
+
+  auth-mongo:
+    image: mongo:7
+    container_name: auth-mongo
+    volumes:
+      - auth_mongo_data:/data/db
+    networks:
+      - backend
+    restart: unless-stopped
+
+  product-mongo:
+    image: mongo:7
+    container_name: product-mongo
+    volumes:
+      - product_mongo_data:/data/db
+    networks:
+      - backend
+    restart: unless-stopped
+
+  order-mongo:
+    image: mongo:7
+    container_name: order-mongo
+    volumes:
+      - order_mongo_data:/data/db
+    networks:
+      - backend
+    restart: unless-stopped
+
+  # ==========================================
+  # MONITORING
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+# ==========================================
+# NETWORKS - İzolasyon
+# ==========================================
+networks:
+  frontend:
+    driver: bridge
+    # Sadece Dispatcher, Prometheus ve Grafana dış dünyaya açık
+  backend:
+    driver: bridge
+    internal: true
+    # Mikroservisler ve DB'ler sadece iç ağda
+
+# ==========================================
+# VOLUMES
+# ==========================================
+volumes:
+  dispatcher_redis_data:
+  auth_mongo_data:
+  product_mongo_data:
+  order_mongo_data:
+  prometheus_data:
+  grafana_data:
