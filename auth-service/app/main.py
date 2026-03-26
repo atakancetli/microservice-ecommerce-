@@ -6,14 +6,19 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
 from app.config import settings
+from app.services.database import Database
+from app.routes.auth_routes import router as auth_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Uygulama başlatma ve kapatma işlemleri."""
+    """Uygulama yaşam döngüsü: DB bağlantı yönetimi."""
+    # Startup — MongoDB'ye bağlan
+    await Database.connect()
     print(f"🔐 Auth Service starting on port 8001")
-    print(f"📦 MongoDB: {settings.MONGO_URL}/{settings.MONGO_DB}")
     yield
+    # Shutdown — MongoDB bağlantısını kapat
+    await Database.disconnect()
     print("🛑 Auth Service shutting down")
 
 
@@ -23,6 +28,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Auth route'larını ekle
+app.include_router(auth_router)
 
 
 @app.get("/health", tags=["Health"])
