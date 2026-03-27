@@ -15,11 +15,15 @@ class DispatcherRouter(IRouter):
     """
 
     # URL prefix → servis adı eşleştirmesi
+    # /api/auth/* → auth-service, /api/products/* → product-service, etc.
     ROUTE_MAP = {
         "/api/auth": "auth-service",
         "/api/products": "product-service",
         "/api/orders": "order-service",
     }
+
+    # /api prefix'i kaldırılır, gerisi servise aynen iletilir
+    API_PREFIX = "/api"
 
     def __init__(self):
         self._services: Dict[str, ServiceInfo] = {}
@@ -48,8 +52,9 @@ class DispatcherRouter(IRouter):
             if path.startswith(prefix):
                 if service_name in self._services:
                     service = self._services[service_name]
-                    # Prefix'ten sonraki path kısmını al
-                    remaining_path = path[len(prefix):]
+                    # /api prefix'ini kaldır, servis yolunu koru
+                    # /api/auth/register → /auth/register
+                    remaining_path = path[len(self.API_PREFIX):]
                     target_url = f"{service.base_url}{remaining_path}"
                     return RouteResult(
                         target_url=target_url,
