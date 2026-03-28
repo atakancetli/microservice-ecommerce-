@@ -199,10 +199,15 @@ async def gateway_proxy(request: Request, path: str):
             body = None
 
     # ─── 4. Proxy Forward ───
+    headers = dict(request.headers)
+    if not await auth_service.is_public_route(full_path) and 'user' in locals():
+        headers["X-User-Id"] = user.user_id
+        headers["X-User-Role"] = user.role
+
     result = await proxy_service.forward_request(
         method=request.method,
         target_url=route.target_url,
-        headers=dict(request.headers),
+        headers=headers,
         body=body,
         query_params=dict(request.query_params),
     )
