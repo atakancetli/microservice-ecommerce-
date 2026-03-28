@@ -8,6 +8,7 @@ from bson import ObjectId
 
 from app.models.order import OrderCreate, OrderStatus
 from app.services.database import Database
+from app.services.product_client import ProductServiceClient
 
 
 class OrderService:
@@ -28,6 +29,11 @@ class OrderService:
         """
         collection = Database.get_collection(cls.COLLECTION)
         
+        # Ürün servisi ile stok kontrolü
+        stock_ok = await ProductServiceClient.check_stocks(order_data.items)
+        if not stock_ok:
+            raise ValueError("Bir veya daha fazla ürün stokta yok veya geçersiz.")
+
         # Toplam fiyatı hesapla
         total_price = sum(item.quantity * item.price_at_order for item in order_data.items)
 
