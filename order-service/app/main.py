@@ -5,15 +5,17 @@ Sipariş oluşturma, listeleme, güncelleme ve iptal işlemleri.
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
-from app.config import settings
+from app.services.database import Database
+from app.routes.order_routes import router as order_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Uygulama başlatma ve kapatma işlemleri."""
+    await Database.connect()
     print(f"🛒 Order Service starting on port 8003")
-    print(f"📦 MongoDB: {settings.MONGO_URL}/{settings.MONGO_DB}")
     yield
+    await Database.disconnect()
     print("🛑 Order Service shutting down")
 
 
@@ -23,6 +25,8 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+app.include_router(order_router)
 
 
 @app.get("/health", tags=["Health"])
