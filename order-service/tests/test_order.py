@@ -49,3 +49,14 @@ class TestOrderResponse:
         )
         assert response.id == "ord-123"
         assert response.status == "pending"
+
+
+class TestOrderServiceInterService:
+    """Servisler arası iletişim ve stok kontrolü testleri (RED)."""
+
+    def test_stock_verification_mock(self):
+        """Ürün servisinden stok kontrolü mock (RED)."""
+        # Bu test service implementasyonu bittiğinde eklenecek, 
+        # şimdilik TDD placeholder.
+        assert True
+
