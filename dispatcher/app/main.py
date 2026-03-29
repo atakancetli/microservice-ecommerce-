@@ -21,6 +21,7 @@ from app.models.interfaces import (
 )
 from app.routes.router import DispatcherRouter
 from app.middleware.auth_middleware import AuthMiddlewareService
+from app.middleware.prometheus_metrics import PrometheusMiddleware, get_prometheus_metrics
 from app.services.proxy_service import ProxyServiceImpl
 from app.services.log_service import RequestLogger
 from app.services.rate_limiter import RateLimiterService
@@ -77,6 +78,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Prometheus Middleware ekle
+app.add_middleware(PrometheusMiddleware)
+
 
 # ============================================================
 # Health & Metrics endpoint'leri (Public)
@@ -93,11 +97,10 @@ async def health_check():
     }
 
 
-@app.get("/metrics", tags=["Monitoring"])
+@app.get("/metrics", tags=["Monitoring"], include_in_schema=True)
 async def metrics():
-    """Prometheus metrikleri için istatistikler."""
-    stats = await logger_service.get_stats()
-    return stats
+    """Prometheus formatında metrikleri döner."""
+    return get_prometheus_metrics()
 
 
 @app.get("/logs", tags=["Monitoring"])
@@ -146,6 +149,17 @@ async def gateway_proxy(request: Request, path: str):
     import time
     start_time = time.time()
     full_path = f"/api/{path}"
+
+    # ─── 0. Rate Limiting ───
+    client_ip = request.client.host if request.client else "unknown"
+    if not await rate_limiter.is_allowed(client_ip):
+        remaining = await rate_limiter.get_remaining(client_ip)
+        await _log_request(full_path, request.method, 429, start_time)
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many requests. Please try again later."},
+            headers={"X-RateLimit-Remaining": str(remaining)},
+        )
 
     # ─── 1. Route Resolution ───
     route = await router_service.resolve_route(full_path)
