@@ -1,0 +1,5 @@
+"""
+Locust — Gereksinimler.
+Yük testi için gerekli Python paketleri.
+"""
+locust==2.20.1
