@@ -10,7 +10,7 @@
 | Atakan Çetli | [@atakancetli](https://github.com/atakancetli) | atakancetli5@gmail.com |
 | Sadık Günay | [@sadikgunay](https://github.com/sadikgunay) | sadkgny2003@gmail.com |
 
-**Tarih:** Mart 2026
+**Tarih:** Mart – Nisan 2026
 
 ---
 
