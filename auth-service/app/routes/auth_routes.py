@@ -91,37 +91,3 @@ async def list_users():
         }
         for user in users
     ]
-
-
-@router.get(
-    "/me",
-    summary="Mevcut kullanıcı profili",
-)
-async def get_current_user(x_user_id: str = None):
-    """
-    X-User-Id header'ından mevcut kullanıcının profilini döner.
-    Gateway tarafından JWT çözümlendikten sonra çağrılır.
-    """
-    if not x_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User ID required.",
-        )
-    user = await AuthService.get_user_by_id(x_user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Kullanıcı bulunamadı.",
-        )
-    return {
-        "id": str(user["_id"]),
-        "username": user["username"],
-        "email": user["email"],
-        "role": user.get("role", "user"),
-    }
-
-
-@router.get("/health", summary="Auth Service sağlık kontrolü")
-async def health():
-    """Auth Service health check."""
-    return {"status": "healthy", "service": "auth-service"}

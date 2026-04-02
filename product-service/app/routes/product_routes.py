@@ -146,31 +146,3 @@ async def delete_product(product_id: str):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Ürün bulunamadı: {product_id}",
         )
-
-
-@router.get(
-    "/stats/summary",
-    summary="Ürün istatistikleri",
-)
-async def product_stats():
-    """
-    Toplam ürün sayısı, kategori dağılımı ve fiyat aralığı.
-    Dashboard ve monitoring için kullanılır.
-    """
-    products = await ProductService.get_all(skip=0, limit=10000)
-    if not products:
-        return {"total": 0, "categories": {}, "avg_price": 0}
-
-    categories = {}
-    total_price = 0
-    for p in products:
-        cat = p.get("category", "general")
-        categories[cat] = categories.get(cat, 0) + 1
-        total_price += p.get("price", 0)
-
-    return {
-        "total": len(products),
-        "categories": categories,
-        "avg_price": round(total_price / len(products), 2),
-        "total_stock": sum(p.get("stock", 0) for p in products),
-    }
