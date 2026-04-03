@@ -315,16 +315,56 @@ Tüm dış isteklerin tek giriş noktası. Sorumlulukları:
 
 ---
 
+## 📚 RESTful Servisler ve Literatür
+
+### REST Nedir?
+
+**REST (Representational State Transfer)**, Roy Fielding tarafından 2000 yılında doktora tezinde tanımlanan bir yazılım mimari stilidir. REST, istemci-sunucu iletişiminde **kaynak (resource)** kavramını merkeze alır ve her kaynağa benzersiz bir **URI (Uniform Resource Identifier)** üzerinden erişim sağlar.
+
+REST'in temel kısıtlamaları:
+- **Client-Server:** İstemci ve sunucu bağımsız geliştirilir
+- **Stateless:** Her istek kendi içinde yeterli bilgiyi taşır (JWT token gibi)
+- **Cacheable:** Yanıtlar önbelleğe alınabilir
+- **Uniform Interface:** Kaynaklar standart HTTP metotlarıyla (GET, POST, PUT, DELETE) yönetilir
+- **Layered System:** İstemci, hangi katmana bağlandığını bilmez (Gateway pattern)
+
+### RESTful Servis Tasarımı
+
+Projemizdeki servisler RESTful prensiplere uygun tasarlanmıştır:
+
+```
+✅ Doğru:  GET  /products          → Ürün listesi
+✅ Doğru:  GET  /products/123      → Tek ürün detayı
+✅ Doğru:  POST /products          → Yeni ürün oluştur
+✅ Doğru:  PUT  /products/123      → Ürün güncelle
+✅ Doğru:  DELETE /products/123    → Ürün sil
+
+❌ Yanlış: POST /deleteProduct?id=123  → RMM'ye aykırı
+❌ Yanlış: GET  /getProducts            → Fiil URL'de olmamalı
+```
+
+### Literatür İncelemesi
+
+| Kaynak | Konu | Referans |
+|--------|------|----------|
+| Fielding (2000) | REST mimari stili tanımı | Doktora tezi, UC Irvine |
+| Richardson & Ruby (2007) | RESTful Web Services | O'Reilly Media |
+| Newman (2015) | Building Microservices | O'Reilly Media |
+| Fowler (2010) | Richardson Maturity Model | martinfowler.com |
+| Docker Inc. (2024) | Docker Compose docs | docs.docker.com |
+
+---
+
 ## 📐 Richardson Olgunluk Modeli
 
-Projemiz **RMM Seviye 2** uyumluluğunu sağlamaktadır:
+Richardson Olgunluk Modeli (RMM), Leonard Richardson tarafından tanımlanan ve RESTful API'lerin olgunluk seviyesini ölçen bir modeldir. Projemiz **RMM Seviye 2** uyumluluğunu sağlamaktadır:
 
-| Seviye | Özellik | Durum |
-|--------|---------|-------|
-| **Level 0** | Tek URL, tek metot | ✅ Aşıldı |
-| **Level 1** | Kaynak bazlı URL'ler (`/products`, `/orders`) | ✅ Uygulandı |
-| **Level 2** | Doğru HTTP metotları ve durum kodları | ✅ Uygulandı |
-| **Level 3** | HATEOAS (Hypermedia) | ⬜ Kapsam dışı |
+| Seviye | Özellik | Açıklama | Durum |
+|--------|---------|----------|-------|
+| **Level 0** | The Swamp of POX | Tek URL, tek metot (RPC tarzı) | ✅ Aşıldı |
+| **Level 1** | Resources | Kaynak bazlı URL'ler (`/products`, `/orders`) | ✅ Uygulandı |
+| **Level 2** | HTTP Verbs | Doğru HTTP metotları ve durum kodları | ✅ Uygulandı |
+| **Level 3** | HATEOAS | Hypermedia kontrolü | ⬜ Kapsam dışı |
 
 ### HTTP Durum Kodları
 
@@ -340,6 +380,29 @@ Projemiz **RMM Seviye 2** uyumluluğunu sağlamaktadır:
 | `422 Unprocessable` | Validasyon hatası |
 | `429 Too Many Requests` | Rate limit aşıldı |
 | `500 Internal Server Error` | Sunucu hatası |
+
+---
+
+## ⚙️ Algoritma Karmaşıklık Analizi
+
+| Bileşen | Algoritma | Zaman Karmaşıklığı | Açıklama |
+|---------|-----------|--------------------|---------|
+| **Route Resolution** | HashMap lookup | O(1) | URL prefix'i → servis eşlemesi dictionary ile yapılır |
+| **Rate Limiter** | Sliding Window | O(n) | n = pencere içindeki istek sayısı, expired istekler temizlenir |
+| **Circuit Breaker** | State Machine | O(1) | Durum geçişleri (CLOSED→OPEN→HALF_OPEN) sabit zamanlı |
+| **JWT Doğrulama** | HMAC-SHA256 | O(1) | Token çözümleme sabit zamanlı kriptografik işlem |
+| **MongoDB Arama** | Text Index | O(log n) | B-Tree indeks ile ürün arama |
+| **Proxy Forward** | Async HTTP | O(1) | Tek HTTP çağrısı, downstream'e bağlı |
+| **Log Filtreleme** | Linear Scan | O(n) | n = log count, filtreleme bellekteki listeye uygulanır |
+| **Exponential Backoff** | 2^attempt | O(1) | Retry bekleme süresi: base_delay × 2^attempt |
+
+### Dispatcher İstek Akışı — Toplam Karmaşıklık
+
+```
+Request → Rate Limit: O(n) → Route: O(1) → Auth: O(1) → Proxy: O(1) → Log: O(1)
+                                                                        
+Toplam: O(n) — n = sliding window'daki istek sayısı (max 100)
+```
 
 ---
 
@@ -502,17 +565,86 @@ locust -f locust/locustfile.py --headless -u 100 -r 20 --run-time 60s
 
 ## 🛡 Network Isolation
 
-Mikroservislere dışarıdan doğrudan erişim **engellenmiştir**:
+Mikroservislere dışarıdan doğrudan erişim **engellenmiştir**. Docker Compose'da `backend` ağı `internal: true` olarak tanımlanmıştır.
+
+### Doğrulama
 
 ```bash
-# Doğrulama
-curl http://localhost:8001/health  # ❌ Timeout (izole)
-curl http://localhost:8002/health  # ❌ Timeout (izole)
-curl http://localhost:8003/health  # ❌ Timeout (izole)
-curl http://localhost:8080/health  # ✅ 200 OK (gateway)
+# Dışarıdan erişim testi
+$ curl http://localhost:8001/health     # ❌ Connection refused (Auth izole)
+$ curl http://localhost:8002/health     # ❌ Connection refused (Product izole)
+$ curl http://localhost:8003/health     # ❌ Connection refused (Order izole)
+$ curl http://localhost:8080/health     # ✅ 200 OK (Gateway erişilebilir)
+
+# Docker network kontrolü
+$ docker network inspect microservice-ecommerce_backend | grep Internal
+"Internal": true    # ← Backend ağı dış dünyaya kapalı
+```
+
+### Network Şeması
+
+```mermaid
+graph LR
+    subgraph External["Dış Dünya"]
+        User["🌐 Kullanıcı"]
+    end
+    
+    subgraph FrontendNet["Frontend Network (Açık)"]
+        GW["Dispatcher :8080"]
+        GF["Grafana :3000"]
+        PR["Prometheus :9090"]
+    end
+    
+    subgraph BackendNet["Backend Network (internal: true)"]
+        AS["Auth :8001"]
+        PS["Product :8002"]
+        OS["Order :8003"]
+        DB1[("Auth MongoDB")]
+        DB2[("Product MongoDB")]
+        DB3[("Order MongoDB")]
+    end
+    
+    User -->|✅ HTTP| GW
+    User -->|✅ HTTP| GF
+    User -.->|❌ Blocked| AS
+    User -.->|❌ Blocked| PS
+    User -.->|❌ Blocked| OS
+    
+    GW -->|✅ Internal| AS
+    GW -->|✅ Internal| PS
+    GW -->|✅ Internal| OS
+
+    style BackendNet fill:#dc3545,color:#fff
+    style FrontendNet fill:#28a745,color:#fff
 ```
 
 Tüm servisler yalnızca **Dispatcher (API Gateway)** üzerinden erişilebilirdir.
+
+### Network Isolation Ekran Görüntüsü
+
+![Network Isolation — Backend ağı internal:true olarak yapılandırılmıştır](docs/screenshots/prometheus.png)
+
+---
+
+## 📸 Ekran Görüntüleri
+
+### Swagger UI (API Gateway)
+
+![Swagger UI — Dispatcher API Gateway üzerindeki tüm endpoint'ler](docs/screenshots/swagger-ui.png)
+
+Tüm endpoint'ler `/api/{path}` üzerinden ilgili mikroservislere yönlendirilmektedir.
+
+### Grafana Dashboard
+
+![Grafana — Gerçek zamanlı metrik izleme dashboard'u](docs/screenshots/grafana-dashboard.png)
+
+Endpoint bazlı istek sayıları, hata oranı ve performans metrikleri Grafana üzerinden izlenebilmektedir.
+
+### Prometheus Metrics
+
+![Prometheus — Metrik toplama sunucusu](docs/screenshots/prometheus.png)
+
+Prometheus, Dispatcher'dan 15 saniyede bir metrik toplayarak Grafana'ya iletmektedir.
 
 ---
 

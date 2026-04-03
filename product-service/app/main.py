@@ -14,7 +14,7 @@ from app.routes.product_routes import router as product_router
 async def lifespan(app: FastAPI):
     """Uygulama yaşam döngüsü: DB bağlantı yönetimi."""
     await Database.connect()
-    print(f"📦 Product Service starting on port {settings.PORT}")
+    print("📦 Product Service starting on port 8002")
     yield
     await Database.disconnect()
     print("🛑 Product Service shutting down")
